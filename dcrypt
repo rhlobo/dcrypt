@@ -1,0 +1,135 @@
+#! /bin/bash
+
+
+# Precondition check for root powers
+if [[ $EUID -ne 0 ]]; then
+    echo "ERROR: This script must be run as root ... Exiting"
+    exit 1
+fi
+
+
+# VARIABLES ###################################################################
+_USER=${SUDO_USER}
+_HOME=$(eval echo ~${_USER})
+_BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+
+# FUNCTION DEFINITION #########################################################
+# Displays help message
+display_help(){
+    local MESSAGE=$1
+    [ ! -z "${MESSAGE}" ] && echo "${MESSAGE}"
+    cat <<EOF
+
+    Usage: $0 luks|tcrypt open|close <name> [device]
+
+EOF
+}
+
+
+# PARSE CLI ARGUMENTS #########################################################
+# luks|tcrypt open|close <name> [device]
+_METHOD=$1
+_COMMAND=$2
+_NAME=$3
+_DEVBLK=$4
+
+[ -z "${_NAME}" ] && {
+    display_help "ERROR: obligatory 'name' parameter is missing."
+    exit 1
+}
+
+case $_METHOD in
+luks|tcrypt)
+;;
+*)
+    display_help "ERROR: Unrecognized encryption mechanism. Should be 'luks' or 'tcrypt'..."
+    exit 1
+;;
+esac
+
+case $_COMMAND in
+open)
+    [ -z "${_DEVBLK}" ] && {
+        _DEVBLK=$(/bin/bash -c "${_BASEDIR}/dmap device ${_NAME}")
+        [ -z "${_DEVBLK}" ] && {
+            display_help "ERROR: Device not mapped on dmap or not present. Please inform desired device."
+	    exit 1
+        }
+    }
+;;
+close)
+    [ ! -z "${_DEVBLK}" ] && display_help "WARN: Device param not needed on close operations."
+;;
+*)
+    display_help "ERROR: Unrecognized command. Should be 'open' or 'close'..."
+    exit 1
+;;
+esac
+
+
+# MAIN ########################################################################
+_MNTDIR="/mnt/${_NAME}"
+
+
+[[ "${_COMMAND}" == "open" ]] && {
+    # EXECUTING OPEN COMMAND
+    # Checking if already mounted
+    mountpoint -q ${_MNTDIR} && {
+        echo "ERROR: ${_MNTDIR} already mounted."
+        exit 1
+    }
+
+    # Checking if device block exists
+    test -e ${_DEVBLK} || {
+        echo "- Block device could not be found."
+        exit 1
+    }
+
+    # Checking if already mapped
+    test -e /dev/mapper/${_NAME} || {
+        [[ "${_METHOD}" == "luks" ]] && {
+            # Decrypting LUKS volume
+            _KEYFILE=${_HOME}/.key/${_NAME}
+
+            # Opening volume
+            test -f ${_KEYFILE} && cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=${_KEYFILE} || cryptsetup luksOpen ${_DEVBLK} ${_NAME}
+        } || {
+            # Decrypting TCRYPT volume
+            cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} || {
+                echo "ERROR: It was not possible to open the device."
+                exit 1
+            }
+        }
+    }
+
+    # Checking if volume was opened
+    test -e /dev/mapper/${_NAME} && {
+        echo "- ${_METHOD^^} volume opened ..." 
+
+        # Mounting
+        mkdir -p "${_MNTDIR}"
+        chown ${_USER}:${_USER} "${_MNTDIR}"
+        mount /dev/mapper/${_NAME} "${_MNTDIR}" && echo "- Mounted ${_MNTDIR}" || echo "- ERROR mounting ${_MNTDIR}"
+    } || echo "- Could not open ${_METHOD^^} volume."
+} || {
+    # EXECUTING CLOSE COMMAND
+    # Checking if volume is mapped
+    test -e /dev/mapper/${_NAME} && {
+        #Checking if umounting is needed
+        mountpoint -q ${_MNTDIR} && {
+            # Umounting
+            umount ${_MNTDIR} || umount -f ${_MNTDIR}
+        }
+
+        [[ "${_METHOD}" == "luks" ]] && {
+            # Closing LUKS volume
+            cryptsetup luksClose ${_NAME}  || echo "ERROR on cryptsetup luksClose."
+        } || {
+            # Closing TCRYPT volume
+            cryptsetup close ${_NAME} || echo "ERROR on cryptsetup TRUECRYPT close."
+        }
+
+        test -e /dev/mapper/${_NAME} || echo "- ${_METHOD^^} partition closed!" 
+    } || echo "- ${_METHOD^^} partition seems to be closed."
+}

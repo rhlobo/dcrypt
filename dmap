@@ -1,0 +1,108 @@
+#! /bin/bash
+
+# VARIABLES ###################################################################
+_HOME=$(eval echo ~${SUDO_USER})
+_CONF="${_HOME}/.dmap"
+
+
+# ASSURE CONFIGURATION FILE ###################################################
+touch "${_CONF}"
+
+
+# FUNCTION DEFINITION #########################################################
+# Display help
+display_help(){
+    local MESSAGE=$1
+    [ ! -z "${MESSAGE}" ] && echo "${MESSAGE}"
+    cat <<EOF
+    Usage: $0 <COMMAND> [command_args]
+
+    list                    Lists all diskmap definitions
+    grep [filter]           Lists filtered diskmap definitions
+
+    uuid <name>             Returns the reference's mapped UUID
+    device <name>           Returns the reference's current device
+
+    add <device> <name>     Adds a device / name mapping
+    rm <name>               Removes mapping
+
+EOF
+}
+
+# List and/or filter
+list(){
+    local FILTER=$1
+    [ -z "${FILTER}" ] && cat "${_CONF}" || cat "${_CONF}" | grep "${FILTER}"
+}
+
+# Get disk uuid by name
+uuid(){
+    local NAME=$1
+    UUID=$(cat "${_CONF}" | grep "^${NAME}\s" | awk '{print $2}')
+    [ -z "$UUID" ] && exit 1
+}
+
+# Get disk block device path by name
+device(){
+    local NAME=$1 
+    uuid "${NAME}"
+    DEVICE="/dev/disk/by-uuid/${UUID}"
+    test -e "${DEVICE}" || {
+        DEVICE=$(blkid | grep "UUID=\"${UUID}\"" | sed -E 's#^([^\:]+):.*#\1#g')
+        test -e "${DEVICE}" || exit 1
+    }
+}
+
+# Saves a new definition on the configuration file
+save(){
+    local BLK=$1
+    local NAME=$2
+    local UUID=$(blkid | grep "^${BLK}:\s" | sed -E 's#^(.*UUID=")([^"]+)(".*)$#\2#g')
+
+    [ ! -z "$UUID" ] && {
+        sed -i "/^${NAME}\s/d" "${_CONF}"
+        echo "${NAME}	${UUID}" >> "${_CONF}"
+    } || {
+        echo "ERROR: UUID could not be determined for block device $BLK"
+        exit 1
+    }
+}
+
+# Removes a definition on the configuration file
+remove(){
+    local NAME=$1
+    sed -i "/^${NAME}\s/d" "${_CONF}"
+}
+
+
+# PARSE CLI ARGUMENTS #########################################################
+key="$1"
+case $key in
+add)
+    save $2 $3
+;;
+rm)
+    remove $2
+;;
+list)
+    list
+;;
+grep)
+    list $2
+;;
+uuid)
+    uuid $2
+    echo "$UUID"
+;;
+device)
+    device $2
+    echo "$DEVICE"
+;;
+help)
+    display_help
+;;
+*)
+    display_help "ERROR: Unrecognized command."
+    exit 1
+;;
+esac
