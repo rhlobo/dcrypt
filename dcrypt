@@ -81,8 +81,8 @@ esac
 _MNTDIR="/mnt/${_NAME}"
 
 
+# EXECUTING OPEN COMMAND
 [[ "${_COMMAND}" == "open" ]] && {
-    # EXECUTING OPEN COMMAND
     # Checking if already mounted
     mountpoint -q ${_MNTDIR} && {
         echo "ERROR: ${_MNTDIR} already mounted."
@@ -114,15 +114,18 @@ _MNTDIR="/mnt/${_NAME}"
 
     # Checking if volume was opened
     test -e /dev/mapper/${_NAME} && {
-        echo "- ${_METHOD^^} volume opened ..." 
+        echo "- ${_METHOD^^} volume opened ..."
 
         # Mounting
         mkdir -p "${_MNTDIR}"
         chown ${_USER}:${_USER} "${_MNTDIR}"
         mount /dev/mapper/${_NAME} "${_MNTDIR}" && echo "- Mounted ${_MNTDIR}" || echo "- ERROR mounting ${_MNTDIR}"
     } || echo "- Could not open ${_METHOD^^} volume."
-} || {
-    # EXECUTING CLOSE COMMAND
+}
+
+
+# EXECUTING CLOSE COMMAND
+[[ "${_COMMAND}" == "close" ]] && {
     # Checking if volume is mapped
     test -e /dev/mapper/${_NAME} && {
         #Checking if umounting is needed
@@ -139,6 +142,6 @@ _MNTDIR="/mnt/${_NAME}"
             cryptsetup close ${_NAME} || echo "ERROR on cryptsetup TRUECRYPT close."
         }
 
-        test -e /dev/mapper/${_NAME} || echo "- ${_METHOD^^} partition closed!" 
+        test -e /dev/mapper/${_NAME} || echo "- ${_METHOD^^} partition closed!"
     } || echo "- ${_METHOD^^} partition seems to be closed."
 }
