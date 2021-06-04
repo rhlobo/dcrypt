@@ -30,7 +30,7 @@ display_help(){
     [ ! -z "${MESSAGE}" ] && echo "${MESSAGE}"
     cat <<EOF
 
-    Usage: $0 luks|tcrypt open|close <name> [device]
+    Usage: $0 luks|tcrypt|vcrypt open|close <name> [device]
 
 EOF
 }
@@ -49,10 +49,10 @@ _DEVBLK=$4
 }
 
 case $_METHOD in
-luks|tcrypt)
+luks|tcrypt|vcrypt)
 ;;
 *)
-    display_help "ERROR: Unrecognized encryption mechanism. Should be 'luks' or 'tcrypt'..."
+    display_help "ERROR: Unrecognized encryption mechanism. Should be 'luks', 'tcrypt' or 'vcrypt'..."
     exit 1
 ;;
 esac
@@ -97,19 +97,30 @@ _MNTDIR="/mnt/${_NAME}"
 
     # Checking if already mapped
     test -e /dev/mapper/${_NAME} || {
-        [[ "${_METHOD}" == "luks" ]] && {
+
+        case $_METHOD in
+        luks)
             # Decrypting LUKS volume
             _KEYFILE=${_HOME}/.key/${_NAME}
 
             # Opening volume
             test -f ${_KEYFILE} && cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=${_KEYFILE} || cryptsetup luksOpen ${_DEVBLK} ${_NAME}
-        } || {
+            ;;
+        tcrypt)
             # Decrypting TCRYPT volume
             cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} || {
                 echo "ERROR: It was not possible to open the device."
                 exit 1
             }
-        }
+            ;;
+        vcrypt)
+            # Decrypting VERACRYPT volume
+            cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} || {
+                echo "ERROR: It was not possible to open the device."
+                exit 1
+            }
+            ;;
+        esac
     }
 
     # Checking if volume was opened
@@ -134,13 +145,16 @@ _MNTDIR="/mnt/${_NAME}"
             umount ${_MNTDIR} || umount -f ${_MNTDIR}
         }
 
-        [[ "${_METHOD}" == "luks" ]] && {
+        case $_METHOD in
+        luks)
             # Closing LUKS volume
             cryptsetup luksClose ${_NAME}  || echo "ERROR on cryptsetup luksClose."
-        } || {
-            # Closing TCRYPT volume
+            ;;
+        tcrypt|vcrypt)
+            # Closing TCRYPT (including VeraCrypt) volume
             cryptsetup close ${_NAME} || echo "ERROR on cryptsetup TRUECRYPT close."
-        }
+            ;;
+        esac
 
         test -e /dev/mapper/${_NAME} || echo "- ${_METHOD^^} partition closed!"
     } || echo "- ${_METHOD^^} partition seems to be closed."
