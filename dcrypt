@@ -98,27 +98,51 @@ _MNTDIR="/mnt/${_NAME}"
     # Checking if already mapped
     test -e /dev/mapper/${_NAME} || {
 
+        # VERIFYNG KEYFILES
+        _KEYFILE_BASENAME=${_HOME}/.dcryptkey/${_NAME}
+        _KEYFARG=""
+        _KEYECHO=""
+        # sshcrypt-key
+        [ -z "${_KEYFILE}" ] && {
+            test -f "${_KEYFILE_BASENAME}.sshcrypt-key" && {
+                which sshcrypt &> /dev/null && {
+                    _KEYFILE="${_KEYFILE_BASENAME}.sshcrypt-key"
+                    _KEYFARG=" --key-file=- "
+                    _KEYECHO=$(sshcrypt agent-decrypt < "${_KEYFILE}")
+                } || echo "WARNING: Key found (${_KEYFILE}), but sshcrypt not in PATH."
+            }
+        }
+        # sshcrypt-pass
+        [ -z "${_KEYFILE}" ] && {
+            test -f "${_KEYFILE_BASENAME}.sshcrypt-pass" && {
+                which sshcrypt &> /dev/null && {
+                    _KEYFILE="${_KEYFILE_BASENAME}.sshcrypt-pass"
+                    _KEYFARG=" --key-file=- "
+                    _KEYECHO=$(sshcrypt agent-decrypt < "${_KEYFILE}")
+                } || echo "WARNING: Key found (${_KEYFILE}), but sshcrypt not in PATH."
+            }
+        }
+        # simple keyfile
+        [ -z "${_KEYFILE}" ] && {
+            test -f "${_KEYFILE_BASENAME}" && {
+                _KEYFILE="${_KEYFILE_BASENAME}"
+                _KEYFARG=" --key-file=\"${_KEYFILE}\" "
+                _KEYECHO=""
+            }
+        }
+
         case $_METHOD in
         luks)
             # Decrypting LUKS volume
-            _KEYFILE=${_HOME}/.key/${_NAME}
-
-            # Opening volume
-            test -f ${_KEYFILE} && cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=${_KEYFILE} || cryptsetup luksOpen ${_DEVBLK} ${_NAME}
+            echo "${_KEYECHO}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         tcrypt)
             # Decrypting TCRYPT volume
-            cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} || {
-                echo "ERROR: It was not possible to open the device."
-                exit 1
-            }
+            echo "${_KEYECHO}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         vcrypt)
             # Decrypting VERACRYPT volume
-            cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} || {
-                echo "ERROR: It was not possible to open the device."
-                exit 1
-            }
+            echo "${_KEYECHO}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         esac
     }
