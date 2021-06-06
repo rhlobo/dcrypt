@@ -99,50 +99,27 @@ _MNTDIR="/mnt/${_NAME}"
     test -e /dev/mapper/${_NAME} || {
 
         # VERIFYNG KEYFILES
-        _KEYFILE_BASENAME=${_HOME}/.dcryptkey/${_NAME}
-        _KEYFARG=""
-        _KEYECHO=""
-        # sshcrypt-key
-        [ -z "${_KEYFILE}" ] && {
-            test -f "${_KEYFILE_BASENAME}.sshcrypt-key" && {
-                which sshcrypt &> /dev/null && {
-                    _KEYFILE="${_KEYFILE_BASENAME}.sshcrypt-key"
-                    _KEYFARG=" --key-file=- "
-                    _KEYECHO=$(sshcrypt agent-decrypt < "${_KEYFILE}")
-                } || echo "WARNING: Key found (${_KEYFILE}), but sshcrypt not in PATH."
-            }
-        }
-        # sshcrypt-pass
-        [ -z "${_KEYFILE}" ] && {
-            test -f "${_KEYFILE_BASENAME}.sshcrypt-pass" && {
-                which sshcrypt &> /dev/null && {
-                    _KEYFILE="${_KEYFILE_BASENAME}.sshcrypt-pass"
-                    _KEYFARG=" --key-file=- "
-                    _KEYECHO=$(sshcrypt agent-decrypt < "${_KEYFILE}")
-                } || echo "WARNING: Key found (${_KEYFILE}), but sshcrypt not in PATH."
-            }
-        }
-        # simple keyfile
-        [ -z "${_KEYFILE}" ] && {
-            test -f "${_KEYFILE_BASENAME}" && {
-                _KEYFILE="${_KEYFILE_BASENAME}"
-                _KEYFARG=" --key-file=\"${_KEYFILE}\" "
-                _KEYECHO=""
-            }
-        }
+        ${_BASEDIR}/dcryptkey test ${_NAME} && _HAS_KEYFILE=true || _HAS_KEYFILE=false
 
+        # DECRYPTING
         case $_METHOD in
         luks)
             # Decrypting LUKS volume
-            echo "${_KEYECHO}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            [ "${_HAS_KEYFILE}" = true ] && {
+                dcryptkey echo "${_NAME}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=-
+            } || cryptsetup luksOpen ${_DEVBLK} ${_NAME}
             ;;
         tcrypt)
             # Decrypting TCRYPT volume
-            echo "${_KEYECHO}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            [ "${_HAS_KEYFILE}" = true ] && {
+                dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            } || cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME}
             ;;
         vcrypt)
             # Decrypting VERACRYPT volume
-            echo "${_KEYECHO}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            [ "${_HAS_KEYFILE}" = true ] && {
+                dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            } || cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME}
             ;;
         esac
     }
@@ -166,17 +143,17 @@ _MNTDIR="/mnt/${_NAME}"
         #Checking if umounting is needed
         mountpoint -q ${_MNTDIR} && {
             # Umounting
-            umount ${_MNTDIR} || umount -f ${_MNTDIR}
+            umount ${_MNTDIR} &> /dev/null || umount -f ${_MNTDIR}
         }
 
         case $_METHOD in
         luks)
             # Closing LUKS volume
-            cryptsetup luksClose ${_NAME}  || echo "ERROR on cryptsetup luksClose."
+            cryptsetup luksClose ${_NAME} &> /dev/null  || echo "ERROR on cryptsetup luksClose."
             ;;
         tcrypt|vcrypt)
             # Closing TCRYPT (including VeraCrypt) volume
-            cryptsetup close ${_NAME} || echo "ERROR on cryptsetup TRUECRYPT close."
+            cryptsetup close ${_NAME} &> /dev/null || echo "ERROR on cryptsetup TRUECRYPT close."
             ;;
         esac
 

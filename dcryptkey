@@ -1,0 +1,133 @@
+#! /bin/bash
+
+
+# VARIABLES ###################################################################
+_USER=${SUDO_USER}
+_HOME=$(eval echo ~${_USER})
+_DCRYPTKEYDIR="${_HOME}/.dcryptkey"
+_MASTERKEY="${_DCRYPTKEYDIR}/.dcryptkey"
+
+
+# FUNCTION DEFINITION #########################################################
+# Displays help message
+display_help(){
+    local MESSAGE=$1
+    [ ! -z "${MESSAGE}" ] && echo "${MESSAGE}"
+    cat <<EOF
+
+    Usage: $0 setup|echo|test <name>
+
+EOF
+}
+
+# Displays error message
+display_error(){
+    cat <<< "$@" 1>&2;
+}
+
+
+# PARSE CLI ARGUMENTS #########################################################
+# setup <name>
+_COMMAND=$1
+_NAME=$2
+
+[ -z "${_NAME}" ] && {
+    display_help "ERROR: obligatory 'name' parameter is missing."
+    exit 1
+}
+
+case $_COMMAND in
+setup|echo|test)
+;;
+*)
+    display_help "ERROR: Unrecognized command."
+    exit 1
+;;
+esac
+
+
+# CHECK DEPENDENCIES ##########################################################
+# sshcrypt
+which sshcrypt &> /dev/null || {
+    display_help "ERROR: sshcrypt not found in PATH."
+    exit 1
+}
+
+
+# MAIN ########################################################################
+[[ "${_COMMAND}" == "setup" ]] && {
+    # Check (unencrypted) keyfile existence
+    _KEYFILE="${_DCRYPTKEYDIR}/${_NAME}"
+    test -f "${_KEYFILE}" || {
+        display_help "ERROR: Keyfile ${_KEYFILE} not found."
+        exit 1
+    }
+
+    # Assure masterkey existence
+    test -f "${_MASTERKEY}" || {
+        echo "Creating MASTERKEY (${_MASTERKEY})"
+        tr -dc 'A-Za-z0-9!"#$%&'\''()*+,-./:;<=>?@[\]^_`{|}~' </dev/urandom | head -c 64 | sshcrypt agent-encrypt > "${_MASTERKEY}" || {
+            display_help "ERROR: FAILED TO CREATE MASTERKEY."
+            cat "${_MASTERKEY}"
+            rm -f "${_MASTERKEY}"
+            exit 1
+        }
+    }
+
+    # Encrypt keyfile using masterkey
+    sshcrypt encrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}" > "${_KEYFILE}.dcryptkey"
+}
+
+[[ "${_COMMAND}" == "echo" ]] && {
+    # Check (unencrypted) keyfile existence
+    _KEYFILE="${_DCRYPTKEYDIR}/${_NAME}"
+    test -f "${_KEYFILE}" && {
+        cat "${_KEYFILE}"
+        exit 0
+    }
+
+    # Check (encrypted) keyfile existence
+    test -f "${_KEYFILE}.dcryptkey" || {
+        display_error "Encrypted keyfile not found."
+        exit 1
+    }
+
+    # Assure masterkey existence
+    test -f "${_MASTERKEY}" || {
+        display_error "MASTERKEY (${_MASTERKEY}) could not be found."
+        echo 1
+    }
+
+    # Dencrypt keyfile using masterkey
+    sshcrypt decrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}.dcryptkey"
+}
+
+[[ "${_COMMAND}" == "test" ]] && {
+    # Check (unencrypted) keyfile existence
+    _KEYFILE="${_DCRYPTKEYDIR}/${_NAME}"
+    test -f "${_KEYFILE}" && {
+        echo "ALERT: Unencrypted keyfile found."
+        exit 0
+    }
+
+    # Check (encrypted) keyfile existence
+    test -f "${_KEYFILE}.dcryptkey" || {
+        display_error "Encrypted keyfile not found."
+        exit 1
+    }
+
+    # Assure masterkey existence
+    test -f "${_MASTERKEY}" || {
+        display_error "MASTERKEY (${_MASTERKEY}) could not be found."
+        echo 1
+    }
+
+    # Dencrypt keyfile using masterkey
+    sshcrypt decrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}.dcryptkey" &> /dev/null && {
+        echo "Masterkey and Keyfile are ok!"
+        exit 0
+    } || {
+        display_error "Could not decrypt keyfile... Does ssh-agent have the identity loaded?"
+        exit 1
+    }
+}
