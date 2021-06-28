@@ -85,8 +85,8 @@ _MNTDIR="/mnt/${_NAME}"
 [[ "${_COMMAND}" == "open" ]] && {
     # Checking if already mounted
     mountpoint -q ${_MNTDIR} && {
-        echo "ERROR: ${_MNTDIR} already mounted."
-        exit 1
+        echo "WARN: ${_MNTDIR} already mounted."
+        exit 0
     }
 
     # Checking if device block exists
@@ -106,19 +106,19 @@ _MNTDIR="/mnt/${_NAME}"
         luks)
             # Decrypting LUKS volume
             [ "${_HAS_KEYFILE}" = true ] && {
-                dcryptkey echo "${_NAME}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=-
+                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=-
             } || cryptsetup luksOpen ${_DEVBLK} ${_NAME}
             ;;
         tcrypt)
             # Decrypting TCRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
-                dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             } || cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME}
             ;;
         vcrypt)
             # Decrypting VERACRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
-                dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             } || cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME}
             ;;
         esac
@@ -131,8 +131,12 @@ _MNTDIR="/mnt/${_NAME}"
         # Mounting
         mkdir -p "${_MNTDIR}"
         chown ${_USER}:${_USER} "${_MNTDIR}"
-        mount /dev/mapper/${_NAME} "${_MNTDIR}" && echo "- Mounted ${_MNTDIR}" || echo "- ERROR mounting ${_MNTDIR}"
+        mount /dev/mapper/${_NAME} "${_MNTDIR}" && {
+            echo "- Mounted ${_MNTDIR}"
+            exit 0
+        } || echo "- ERROR mounting ${_MNTDIR}"
     } || echo "- Could not open ${_METHOD^^} volume."
+    exit 1
 }
 
 
@@ -157,6 +161,9 @@ _MNTDIR="/mnt/${_NAME}"
             ;;
         esac
 
-        test -e /dev/mapper/${_NAME} || echo "- ${_METHOD^^} partition closed!"
+        test -e /dev/mapper/${_NAME} && {
+            echo "- ERROR: Could not close ${_NAME}."
+            exit 1
+        } || echo "- ${_METHOD^^} partition closed!"
     } || echo "- ${_METHOD^^} partition seems to be closed."
 }

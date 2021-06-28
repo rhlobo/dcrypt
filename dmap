@@ -39,17 +39,21 @@ list(){
 uuid(){
     local NAME=$1
     UUID=$(cat "${_CONF}" | grep "^${NAME}\s" | awk '{print $2}')
-    [ -z "$UUID" ] && exit 1
+    #[ -z "$UUID" ] && exit 1
 }
 
 # Get disk block device path by name
 device(){
-    local NAME=$1 
+    local NAME=$1
     uuid "${NAME}"
-    DEVICE="/dev/disk/by-uuid/${UUID}"
-    test -e "${DEVICE}" || {
-        DEVICE=$(blkid | grep "UUID=\"${UUID}\"" | sed -E 's#^([^\:]+):.*#\1#g')
-        test -e "${DEVICE}" || exit 1
+    [ -z "$UUID" ] && {
+        test -f "${_CONF}.${NAME}" && DEVICE=$(cat "${_CONF}.${NAME}") || exit 1
+    } || {
+        DEVICE="/dev/disk/by-uuid/${UUID}"
+        test -e "${DEVICE}" || {
+            DEVICE=$(blkid | grep "UUID=\"${UUID}\"" | sed -E 's#^([^\:]+):.*#\1#g')
+            test -e "${DEVICE}" || exit 1
+        }
     }
 }
 
