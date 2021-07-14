@@ -30,7 +30,11 @@ display_help(){
     [ ! -z "${MESSAGE}" ] && echo "${MESSAGE}"
     cat <<EOF
 
-    Usage: $0 luks|tcrypt|vcrypt open|close <name> [device]
+Usage: $0 luks|tcrypt|vcrypt open|close <name> [DEVICE] [OPTIONS]
+
+OPTIONS:
+    --key-file, -h      Keyfile to use when opening an encrypted disk
+    --help, -h          This help
 
 EOF
 }
@@ -38,11 +42,41 @@ EOF
 
 # PARSE CLI ARGUMENTS #########################################################
 # luks|tcrypt open|close <name> [device]
+
+# Default option values
+_EXT_KEYFILE=""
+
+# Pasing input parameters
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+    key="$1"
+
+    case $key in
+        -h|--help)
+            display_help
+            exit 0
+            ;;
+        -k|--key-file)
+            _EXT_KEYFILE="$2"
+            shift
+            shift
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+# Parsing Positional Params
 _METHOD=$1
 _COMMAND=$2
 _NAME=$3
 _DEVBLK=$4
 
+# Checking Params
 [ -z "${_NAME}" ] && {
     display_help "ERROR: obligatory 'name' parameter is missing."
     exit 1
@@ -100,6 +134,11 @@ _MNTDIR="/mnt/${_NAME}"
 
         # VERIFYNG KEYFILES
         ${_BASEDIR}/dcryptkey test ${_NAME} && _HAS_KEYFILE=true || _HAS_KEYFILE=false
+        [ -z "${_EXT_KEYFILE}" ] || {
+            test -f "${_EXT_KEYFILE}" && {
+                _KEYFARG=" --key-file=${_EXT_KEYFILE} "
+            }
+        }
 
         # DECRYPTING
         case $_METHOD in
@@ -113,13 +152,13 @@ _MNTDIR="/mnt/${_NAME}"
             # Decrypting TCRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
                 ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
-            } || cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME}
+            } || cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         vcrypt)
             # Decrypting VERACRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
                 ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
-            } || cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME}
+            } || cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         esac
     }
