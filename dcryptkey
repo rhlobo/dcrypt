@@ -53,6 +53,9 @@ which sshcrypt &> /dev/null || {
     exit 1
 }
 
+# is root user
+[[ $EUID -ne 0 ]] && _ISROOT=false || _ISROOT=true
+
 
 # MAIN ########################################################################
 [[ "${_COMMAND}" == "setup" ]] && {
@@ -75,8 +78,11 @@ which sshcrypt &> /dev/null || {
     }
 
     # Encrypt keyfile using masterkey
-    sshcrypt encrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}" > "${_KEYFILE}.dcryptkey"
+    [ "${_ISROOT}" = true ] && {
+        su ${_USER} -c "sshcrypt encrypt -p \"$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}\" > \"${_KEYFILE}.dcryptkey\""
+    } || sshcrypt encrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}" > "${_KEYFILE}.dcryptkey"
 }
+
 
 [[ "${_COMMAND}" == "echo" ]] && {
     # Check (unencrypted) keyfile existence
@@ -99,8 +105,11 @@ which sshcrypt &> /dev/null || {
     }
 
     # Dencrypt keyfile using masterkey
-    sshcrypt decrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}.dcryptkey"
+    [ "${_ISROOT}" = true ] && {
+        su ${_USER} -c "sshcrypt decrypt -p \"$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}.dcryptkey\""
+    } || sshcrypt decrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}.dcryptkey"
 }
+
 
 [[ "${_COMMAND}" == "test" ]] && {
     # Check (unencrypted) keyfile existence
@@ -127,7 +136,12 @@ which sshcrypt &> /dev/null || {
         echo "Masterkey and Keyfile are ok!"
         exit 0
     } || {
-        display_error "Could not decrypt keyfile... Does ssh-agent have the identity loaded?"
-        exit 1
+        [ "${_ISROOT}" = true] && su ${_USER} -c "sshcrypt decrypt -p \"$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}.dcryptkey\" &> /dev/null" && {
+            echo "Masterkey and Keyfile are ok!"
+            exit 0
+        } || {
+            display_error "Could not decrypt keyfile... Does ssh-agent have the identity loaded?"
+            exit 1
+        }
     }
 }
