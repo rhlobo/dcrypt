@@ -78,9 +78,9 @@ which sshcrypt &> /dev/null || {
     }
 
     # Encrypt keyfile using masterkey
-    [ "${_ISROOT}" = true ] && {
-        su ${_USER} -c "sshcrypt encrypt -p \"$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}\" > \"${_KEYFILE}.dcryptkey\""
-    } || sshcrypt encrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}" > "${_KEYFILE}.dcryptkey"
+    [ "${_ISROOT}" = false ] && {
+        sshcrypt encrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}" > "${_KEYFILE}.dcryptkey"
+    } || su ${_USER} -c "sshcrypt encrypt -p \"\$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}\" > \"${_KEYFILE}.dcryptkey\""
 }
 
 
@@ -105,9 +105,9 @@ which sshcrypt &> /dev/null || {
     }
 
     # Dencrypt keyfile using masterkey
-    [ "${_ISROOT}" = true ] && {
-        su ${_USER} -c "sshcrypt decrypt -p \"$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}.dcryptkey\""
-    } || sshcrypt decrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}.dcryptkey"
+    [ "${_ISROOT}" = false ] && {
+        sshcrypt decrypt -p "$(sshcrypt agent-decrypt < ${_MASTERKEY})" < "${_KEYFILE}.dcryptkey"
+    } || su ${_USER} -c "sshcrypt decrypt -p \"\$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}.dcryptkey\""
 }
 
 
@@ -136,7 +136,7 @@ which sshcrypt &> /dev/null || {
         echo "Masterkey and Keyfile are ok!"
         exit 0
     } || {
-        [ "${_ISROOT}" = true ] && su ${_USER} -c "sshcrypt decrypt -p \"$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}.dcryptkey\" &> /dev/null" && {
+        [ "${_ISROOT}" = true ] && su ${_USER} -c "sshcrypt decrypt -p \"\$(sshcrypt agent-decrypt < ${_MASTERKEY})\" < \"${_KEYFILE}.dcryptkey\" &> /dev/null" && {
             echo "Masterkey and Keyfile are ok!"
             exit 0
         } || {
