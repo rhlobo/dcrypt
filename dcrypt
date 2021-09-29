@@ -34,6 +34,7 @@ Usage: $0 luks|tcrypt|vcrypt open|close <name> [DEVICE] [OPTIONS]
 
 OPTIONS:
     --key-file, -h      Keyfile to use when opening an encrypted disk
+    --read-only, -r     Map disk as read only
     --help, -h          This help
 
 EOF
@@ -45,6 +46,7 @@ EOF
 
 # Default option values
 _EXT_KEYFILE=""
+_READ_ONLY=false
 
 # Pasing input parameters
 POSITIONAL=()
@@ -60,6 +62,10 @@ do
         -k|--key-file)
             _EXT_KEYFILE="$2"
             shift
+            shift
+            ;;
+        -r|--read-only)
+            _READ_ONLY=true
             shift
             ;;
         *)
@@ -140,25 +146,28 @@ _MNTDIR="/mnt/${_NAME}"
             }
         }
 
+        # PREPARING ARGUMENTS FOR WRITE/READ OR READ ONLY MAPPING
+        [ "${_READ_ONLY}" = true ] && _RW_PARAM=" --read-only " || _RW_PARAM=""
+
         # DECRYPTING
         case $_METHOD in
         luks)
             # Decrypting LUKS volume
             [ "${_HAS_KEYFILE}" = true ] && {
                 ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=-
-            } || cryptsetup luksOpen ${_DEVBLK} ${_NAME}
+            } || cryptsetup "${_RW_PARAM}" luksOpen ${_DEVBLK} ${_NAME}
             ;;
         tcrypt)
             # Decrypting TCRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
                 ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
-            } || cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            } || cryptsetup "${_RW_PARAM}" --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         vcrypt)
             # Decrypting VERACRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
                 ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
-            } || cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+            } || cryptsetup "${_RW_PARAM}" --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         esac
     }
