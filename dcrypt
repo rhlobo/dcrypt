@@ -147,7 +147,7 @@ _MNTDIR="/mnt/${_NAME}"
         }
 
         # PREPARING ARGUMENTS FOR WRITE/READ OR READ ONLY MAPPING
-        [ "${_READ_ONLY}" = true ] && _RW_PARAM=" --read-only " || _RW_PARAM=""
+        [ "${_READ_ONLY}" = true ] && _RW_PARAM=" --readonly " || _RW_PARAM=""
 
         # DECRYPTING
         case $_METHOD in
