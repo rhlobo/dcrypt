@@ -176,10 +176,13 @@ _MNTDIR="/mnt/${_NAME}"
     test -e /dev/mapper/${_NAME} && {
         echo "- ${_METHOD^^} volume opened ..."
 
+        # PREPARING ARGUMENTS FOR WRITE/READ OR READ ONLY MOUNTING
+        [ "${_READ_ONLY}" = true ] && _RW_PARAM="-o ro,noload" || _RW_PARAM=""
+
         # Mounting
         mkdir -p "${_MNTDIR}"
         chown ${_USER}:${_USER} "${_MNTDIR}"
-        mount /dev/mapper/${_NAME} "${_MNTDIR}" && {
+        mount ${_RW_PARAM} /dev/mapper/${_NAME} "${_MNTDIR}" && {
             echo "- Mounted ${_MNTDIR}"
             exit 0
         } || echo "- ERROR mounting ${_MNTDIR}"
