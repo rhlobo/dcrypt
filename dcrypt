@@ -154,19 +154,21 @@ _MNTDIR="/mnt/${_NAME}"
         luks)
             # Decrypting LUKS volume
             [ "${_HAS_KEYFILE}" = true ] && {
-                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup luksOpen ${_DEVBLK} ${_NAME} --key-file=-
+                echo "cryptsetup ${_RW_PARAM} luksOpen ${_DEVBLK} ${_NAME}"
+
+                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup "${_RW_PARAM}" luksOpen ${_DEVBLK} ${_NAME} --key-file=-
             } || cryptsetup "${_RW_PARAM}" luksOpen ${_DEVBLK} ${_NAME}
             ;;
         tcrypt)
             # Decrypting TCRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
-                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup "${_RW_PARAM}" --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             } || cryptsetup "${_RW_PARAM}" --type tcrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         vcrypt)
             # Decrypting VERACRYPT volume
             [ "${_HAS_KEYFILE}" = true ] && {
-                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
+                ${_BASEDIR}/dcryptkey echo "${_NAME}" | cryptsetup "${_RW_PARAM}" --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             } || cryptsetup "${_RW_PARAM}" --type tcrypt --veracrypt open ${_DEVBLK} ${_NAME} ${_KEYFARG}
             ;;
         esac
