@@ -110,6 +110,9 @@ open)
 close)
     [ ! -z "${_DEVBLK}" ] && display_help "WARN: Device param not needed on close operations."
 ;;
+status)
+    [ -z "${_DEVBLK}" ] && _DEVBLK=$(/bin/bash -c "${_BASEDIR}/dmap device ${_NAME}")
+;;
 *)
     display_help "ERROR: Unrecognized command. Should be 'open' or 'close'..."
     exit 1
@@ -217,4 +220,23 @@ _MNTDIR="/mnt/${_NAME}"
             exit 1
         } || echo "- ${_METHOD^^} partition closed!"
     } || echo "- ${_METHOD^^} partition seems to be closed."
+}
+
+
+# EXECUTING STATUS COMMAND
+[[ "${_COMMAND}" == "status" ]] && {
+    # Checking if device block present
+    [ -z "${_DEVBLK}" ] && \
+        echo "Device not present." || \
+        echo "Device ${_DEVBLK} found."
+
+    # Checking if volume is mapped
+    test -e /dev/mapper/${_NAME} && \
+        echo "Volume is opened." || \
+        echo "Volume is closed."
+
+    #Checking if umounting is needed
+    mountpoint -q ${_MNTDIR} && \
+        echo "Mounted at ${_MNTDIR}" || \
+        echo "Nothing mounted, as expected."
 }
