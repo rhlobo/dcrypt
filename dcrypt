@@ -9,9 +9,9 @@ fi
 
 
 # VARIABLES ###################################################################
-#_USER=${SUDO_USER}
-_USER="${SUDO_USER:-$(logname)}"
-_HOME=$(eval echo ~${_USER})
+export _USER=${_USER:-${SUDO_USER:-$(logname)}}
+export _HOME=${_HOME:-$(eval echo ~${_USER})}
+export SSH_AUTH_SOCK="${SSH_AUTH_SOCK}"
 
 # Script base directory (resolving symlinks)
 _BASEDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -101,7 +101,7 @@ esac
 case $_COMMAND in
 open)
     [ -z "${_DEVBLK}" ] && {
-        _DEVBLK=$(/bin/bash -c "${_BASEDIR}/dmap device ${_NAME}")
+        _DEVBLK=$(/bin/bash -c "_USER=$_USER ${_BASEDIR}/dmap device ${_NAME}")
         [ -z "${_DEVBLK}" ] && {
             display_help "ERROR: Device not mapped on dmap or not present. Please inform desired device."
 	    exit 1
@@ -112,7 +112,7 @@ close)
     [ ! -z "${_DEVBLK}" ] && display_help "WARN: Device param not needed on close operations."
 ;;
 status)
-    [ -z "${_DEVBLK}" ] && _DEVBLK=$(/bin/bash -c "${_BASEDIR}/dmap device ${_NAME}")
+    [ -z "${_DEVBLK}" ] && _DEVBLK=$(/bin/bash -c "_USER=$_USER ${_BASEDIR}/dmap device ${_NAME}")
 ;;
 *)
     display_help "ERROR: Unrecognized command. Should be 'open' or 'close'..."
@@ -141,6 +141,9 @@ _MNTDIR="/mnt/${_NAME}"
 
     # Checking if already mapped
     test -e /dev/mapper/${_NAME} || {
+
+        # DISPLAYING USER and AGENT KEYS
+        echo "INFO: Running as ${_USER} ($(ssh-add -l | wc -l) keys in agent) ..."
 
         # VERIFYNG KEYFILES
         ${_BASEDIR}/dcryptkey test ${_NAME} && _HAS_KEYFILE=true || _HAS_KEYFILE=false

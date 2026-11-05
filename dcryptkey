@@ -3,8 +3,9 @@
 
 # VARIABLES ###################################################################
 #_USER=${SUDO_USER}
-_USER="${SUDO_USER:-$(logname)}"
-_HOME=$(eval echo ~${_USER})
+export _USER=${_USER:-${SUDO_USER:-$(logname)}}
+export _HOME=${_HOME:-$(eval echo ~${_USER})}
+export SSH_AUTH_SOCK="${SSH_AUTH_SOCK}"
 _DCRYPTKEYDIR="${_HOME}/.dcryptkey"
 _MASTERKEY="${_DCRYPTKEYDIR}/.dcryptkey"
 
